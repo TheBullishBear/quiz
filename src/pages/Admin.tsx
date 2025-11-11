@@ -470,28 +470,52 @@ const Admin = () => {
                             </div>
                             <div className="flex gap-2">
                               {session.status === 'not_started' && (
-                                <Button onClick={() => handleUpdateSessionStatus(session.id, 'active')}>
+                                <Button onClick={() => handleUpdateSessionStatus(session.id, 'round_1')}>
                                   <Play className="h-4 w-4 mr-1" />
-                                  Start
+                                  Start Round 1
                                 </Button>
                               )}
-                              {session.status === 'active' && (
+                              {session.status === 'round_1' && (
                                 <>
-                                  <Button variant="secondary" onClick={() => handleUpdateSessionStatus(session.id, 'paused')}>
-                                    <Pause className="h-4 w-4 mr-1" />
-                                    Pause
+                                  <Button onClick={() => handleUpdateSessionStatus(session.id, 'round_2')}>
+                                    <SkipForward className="h-4 w-4 mr-1" />
+                                    Next Round
                                   </Button>
                                   <Button variant="outline" onClick={() => handleUpdateSessionStatus(session.id, 'completed')}>
-                                    <SkipForward className="h-4 w-4 mr-1" />
-                                    End
+                                    End Quiz
                                   </Button>
                                 </>
                               )}
-                              {session.status === 'paused' && (
-                                <Button onClick={() => handleUpdateSessionStatus(session.id, 'active')}>
-                                  <Play className="h-4 w-4 mr-1" />
-                                  Resume
+                              {session.status === 'round_2' && (
+                                <>
+                                  <Button onClick={() => handleUpdateSessionStatus(session.id, 'round_3')}>
+                                    <SkipForward className="h-4 w-4 mr-1" />
+                                    Next Round
+                                  </Button>
+                                  <Button variant="outline" onClick={() => handleUpdateSessionStatus(session.id, 'completed')}>
+                                    End Quiz
+                                  </Button>
+                                </>
+                              )}
+                              {session.status === 'round_3' && (
+                                <>
+                                  <Button onClick={() => handleUpdateSessionStatus(session.id, 'finals')}>
+                                    <SkipForward className="h-4 w-4 mr-1" />
+                                    Start Finals
+                                  </Button>
+                                  <Button variant="outline" onClick={() => handleUpdateSessionStatus(session.id, 'completed')}>
+                                    End Quiz
+                                  </Button>
+                                </>
+                              )}
+                              {session.status === 'finals' && (
+                                <Button onClick={() => handleUpdateSessionStatus(session.id, 'completed')}>
+                                  <Award className="h-4 w-4 mr-1" />
+                                  Complete Quiz
                                 </Button>
+                              )}
+                              {session.status === 'completed' && (
+                                <span className="text-sm text-muted-foreground">Quiz completed</span>
                               )}
                             </div>
                           </div>
