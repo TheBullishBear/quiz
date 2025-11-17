@@ -36,7 +36,7 @@ const Quiz = () => {
       .neq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!sessionData) {
       toast({
@@ -50,14 +50,46 @@ const Quiz = () => {
 
     setSession(sessionData);
 
-    if (sessionData.current_question_id) {
-      const { data: questionData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('id', sessionData.current_question_id)
-        .single();
+    // Determine the current round from status
+    const statusToRound: { [key: string]: number } = {
+      'round_1': 1,
+      'round_2': 2,
+      'round_3': 3,
+      'finals': 4,
+    };
 
-      setCurrentQuestion(questionData);
+    const currentRound = statusToRound[sessionData.status];
+    
+    if (!currentRound) {
+      // Quiz hasn't started yet
+      return;
+    }
+
+    // Fetch all questions for the current round
+    const { data: roundQuestions } = await supabase
+      .from('questions')
+      .select('*')
+      .eq('round_number', currentRound)
+      .order('question_order', { ascending: true });
+
+    if (!roundQuestions || roundQuestions.length === 0) {
+      return;
+    }
+
+    // Fetch user's answers for this session
+    const { data: userAnswers } = await supabase
+      .from('participant_answers')
+      .select('question_id')
+      .eq('user_id', user!.id)
+      .eq('session_id', sessionData.id);
+
+    const answeredQuestionIds = new Set(userAnswers?.map(a => a.question_id) || []);
+
+    // Find the first unanswered question
+    const nextQuestion = roundQuestions.find(q => !answeredQuestionIds.has(q.id));
+
+    if (nextQuestion) {
+      setCurrentQuestion(nextQuestion);
       setStartTime(Date.now());
     }
   };
