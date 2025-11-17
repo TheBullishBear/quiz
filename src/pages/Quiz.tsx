@@ -212,14 +212,38 @@ const Quiz = () => {
             </div>
 
             <div className="space-y-4">
-              <label className="text-sm font-medium">Your Answer</label>
-              <textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Type your answer here..."
-                className="w-full min-h-[150px] p-4 rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={submitting}
-              />
+              <label className="text-sm font-medium">Select Your Answer</label>
+              <div className="space-y-3">
+                {[
+                  { value: 'A', text: currentQuestion.option_a },
+                  { value: 'B', text: currentQuestion.option_b },
+                  { value: 'C', text: currentQuestion.option_c },
+                  { value: 'D', text: currentQuestion.option_d }
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      answer === option.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="answer"
+                      value={option.value}
+                      checked={answer === option.value}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      disabled={submitting}
+                      className="mt-1 h-4 w-4 text-primary"
+                    />
+                    <div className="flex-1">
+                      <span className="font-semibold text-primary mr-2">{option.value}.</span>
+                      <span className="text-foreground">{option.text}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <Button

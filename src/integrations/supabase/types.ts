@@ -104,6 +104,10 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
+          option_a: string
+          option_b: string
+          option_c: string
+          option_d: string
           question_order: number
           question_text: string
           round_number: number
@@ -113,6 +117,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
           question_order: number
           question_text: string
           round_number: number
@@ -122,6 +130,10 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           id?: string
+          option_a?: string
+          option_b?: string
+          option_c?: string
+          option_d?: string
           question_order?: number
           question_text?: string
           round_number?: number

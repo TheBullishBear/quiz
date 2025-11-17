@@ -26,6 +26,10 @@ interface Profile {
 interface Question {
   id: string;
   question_text: string;
+  option_a: string;
+  option_b: string;
+  option_c: string;
+  option_d: string;
   correct_answer: string;
   round_number: number;
   question_order: number;
@@ -51,7 +55,11 @@ const Admin = () => {
   
   const [newQuestion, setNewQuestion] = useState({
     question_text: '',
-    correct_answer: '',
+    option_a: '',
+    option_b: '',
+    option_c: '',
+    option_d: '',
+    correct_answer: 'A',
     round_number: 1,
     question_order: 1
   });
@@ -128,10 +136,11 @@ const Admin = () => {
   };
 
   const handleAddQuestion = async () => {
-    if (!newQuestion.question_text || !newQuestion.correct_answer) {
+    if (!newQuestion.question_text || !newQuestion.option_a || !newQuestion.option_b || 
+        !newQuestion.option_c || !newQuestion.option_d) {
       toast({
         title: 'Error',
-        description: 'Please fill in all fields',
+        description: 'Please fill in the question and all 4 options',
         variant: 'destructive'
       });
       return;
@@ -154,7 +163,11 @@ const Admin = () => {
       });
       setNewQuestion({
         question_text: '',
-        correct_answer: '',
+        option_a: '',
+        option_b: '',
+        option_c: '',
+        option_d: '',
+        correct_answer: 'A',
         round_number: 1,
         question_order: 1
       });
@@ -363,13 +376,58 @@ const Admin = () => {
                       placeholder="Enter question text"
                     />
                   </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Option A</Label>
+                      <Input
+                        value={newQuestion.option_a}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, option_a: e.target.value })}
+                        placeholder="Enter option A"
+                      />
+                    </div>
+                    <div>
+                      <Label>Option B</Label>
+                      <Input
+                        value={newQuestion.option_b}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, option_b: e.target.value })}
+                        placeholder="Enter option B"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <Label>Option C</Label>
+                      <Input
+                        value={newQuestion.option_c}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, option_c: e.target.value })}
+                        placeholder="Enter option C"
+                      />
+                    </div>
+                    <div>
+                      <Label>Option D</Label>
+                      <Input
+                        value={newQuestion.option_d}
+                        onChange={(e) => setNewQuestion({ ...newQuestion, option_d: e.target.value })}
+                        placeholder="Enter option D"
+                      />
+                    </div>
+                  </div>
                   <div>
                     <Label>Correct Answer</Label>
-                    <Input
+                    <Select
                       value={newQuestion.correct_answer}
-                      onChange={(e) => setNewQuestion({ ...newQuestion, correct_answer: e.target.value })}
-                      placeholder="Enter correct answer"
-                    />
+                      onValueChange={(value) => setNewQuestion({ ...newQuestion, correct_answer: value })}
+                    >
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select correct option" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="A">Option A</SelectItem>
+                        <SelectItem value="B">Option B</SelectItem>
+                        <SelectItem value="C">Option C</SelectItem>
+                        <SelectItem value="D">Option D</SelectItem>
+                      </SelectContent>
+                    </Select>
                   </div>
                   <Button onClick={handleAddQuestion} className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
@@ -392,7 +450,8 @@ const Admin = () => {
                           <TableHead>Round</TableHead>
                           <TableHead>Order</TableHead>
                           <TableHead>Question</TableHead>
-                          <TableHead>Answer</TableHead>
+                          <TableHead>Options</TableHead>
+                          <TableHead>Correct</TableHead>
                           <TableHead>Actions</TableHead>
                         </TableRow>
                       </TableHeader>
@@ -402,7 +461,17 @@ const Admin = () => {
                             <TableCell>Round {question.round_number}</TableCell>
                             <TableCell>#{question.question_order}</TableCell>
                             <TableCell className="max-w-md truncate">{question.question_text}</TableCell>
-                            <TableCell>{question.correct_answer}</TableCell>
+                            <TableCell className="text-xs">
+                              <div className="space-y-1">
+                                <div>A: {question.option_a}</div>
+                                <div>B: {question.option_b}</div>
+                                <div>C: {question.option_c}</div>
+                                <div>D: {question.option_d}</div>
+                              </div>
+                            </TableCell>
+                            <TableCell>
+                              <span className="font-bold text-primary">Option {question.correct_answer}</span>
+                            </TableCell>
                             <TableCell>
                               <Dialog>
                                 <DialogTrigger asChild>
