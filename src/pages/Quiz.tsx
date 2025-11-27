@@ -69,9 +69,9 @@ const Quiz = () => {
       return;
     }
 
-    // Fetch all questions for the current round
+    // Fetch all questions for the current round (without answers)
     const { data: roundQuestions } = await supabase
-      .from('questions')
+      .from('questions_without_answers')
       .select('*')
       .eq('round_number', currentRound)
       .order('question_order', { ascending: true });
