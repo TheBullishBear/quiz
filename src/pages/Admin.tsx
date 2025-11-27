@@ -10,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useToast } from '@/hooks/use-toast';
-import { Trophy, Users, CheckCircle, XCircle, Trash2, Plus, Play, Pause, SkipForward, Award } from 'lucide-react';
+import { Trophy, Users, CheckCircle, XCircle, Trash2, Plus, Play, Pause, SkipForward, Award, Clock, Settings } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 
 interface Profile {
@@ -41,6 +41,17 @@ interface QuizSession {
   current_round: number;
   current_question_id: string | null;
   created_at: string;
+  time_limit_seconds: number;
+}
+
+interface QuestionResult {
+  user_id: string;
+  full_name: string;
+  answer: string;
+  is_correct: boolean;
+  time_taken_ms: number;
+  points_earned: number;
+  created_at: string;
 }
 
 const Admin = () => {
@@ -52,6 +63,9 @@ const Admin = () => {
   const [allProfiles, setAllProfiles] = useState<Profile[]>([]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [sessions, setSessions] = useState<QuizSession[]>([]);
+  const [selectedSession, setSelectedSession] = useState<string | null>(null);
+  const [questionResults, setQuestionResults] = useState<QuestionResult[]>([]);
+  const [newTimeLimit, setNewTimeLimit] = useState<number>(60);
   
   const [newQuestion, setNewQuestion] = useState({
     question_text: '',
@@ -199,7 +213,7 @@ const Admin = () => {
   const handleCreateSession = async () => {
     const { error } = await supabase
       .from('quiz_sessions')
-      .insert([{ status: 'not_started', current_round: 1 }]);
+      .insert([{ status: 'not_started', current_round: 1, time_limit_seconds: newTimeLimit }]);
 
     if (error) {
       toast({
@@ -237,6 +251,68 @@ const Admin = () => {
     }
   };
 
+  const handleUpdateTimeLimit = async (sessionId: string, timeLimit: number) => {
+    const { error } = await supabase
+      .from('quiz_sessions')
+      .update({ time_limit_seconds: timeLimit })
+      .eq('id', sessionId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to update time limit',
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'Time limit updated successfully'
+      });
+      fetchSessions();
+    }
+  };
+
+  const fetchQuestionResults = async (sessionId: string) => {
+    const { data } = await supabase
+      .from('participant_answers')
+      .select(`
+        user_id,
+        answer,
+        is_correct,
+        time_taken_ms,
+        points_earned,
+        created_at,
+        profiles!inner(full_name)
+      `)
+      .eq('session_id', sessionId)
+      .order('is_correct', { ascending: false })
+      .order('time_taken_ms', { ascending: true });
+
+    if (data) {
+      const results: QuestionResult[] = data.map((item: any) => ({
+        user_id: item.user_id,
+        full_name: item.profiles.full_name,
+        answer: item.answer,
+        is_correct: item.is_correct,
+        time_taken_ms: item.time_taken_ms,
+        points_earned: item.points_earned,
+        created_at: item.created_at
+      }));
+      setQuestionResults(results);
+    }
+  };
+
+  useEffect(() => {
+    if (selectedSession) {
+      fetchQuestionResults(selectedSession);
+      // Refresh results every 5 seconds
+      const interval = setInterval(() => {
+        fetchQuestionResults(selectedSession);
+      }, 5000);
+      return () => clearInterval(interval);
+    }
+  }, [selectedSession]);
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
@@ -263,10 +339,11 @@ const Admin = () => {
         </div>
 
         <Tabs defaultValue="approvals" className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5">
+          <TabsList className="grid w-full grid-cols-6">
             <TabsTrigger value="approvals">Approvals</TabsTrigger>
             <TabsTrigger value="questions">Questions</TabsTrigger>
             <TabsTrigger value="sessions">Quiz Control</TabsTrigger>
+            <TabsTrigger value="results">Live Results</TabsTrigger>
             <TabsTrigger value="users">All Users</TabsTrigger>
             <TabsTrigger value="leaderboard">Leaderboard</TabsTrigger>
           </TabsList>
@@ -515,10 +592,22 @@ const Admin = () => {
                 <CardDescription>Create and manage quiz sessions</CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                <Button onClick={handleCreateSession} className="w-full">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Create New Session
-                </Button>
+                <div className="flex gap-4 items-end">
+                  <div className="flex-1">
+                    <Label>Default Timer (seconds)</Label>
+                    <Input
+                      type="number"
+                      min="10"
+                      max="300"
+                      value={newTimeLimit}
+                      onChange={(e) => setNewTimeLimit(parseInt(e.target.value) || 60)}
+                    />
+                  </div>
+                  <Button onClick={handleCreateSession} className="flex-1">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Create New Session
+                  </Button>
+                </div>
 
                 {sessions.length === 0 ? (
                   <p className="text-center text-muted-foreground py-8">No sessions created yet</p>
@@ -528,7 +617,7 @@ const Admin = () => {
                       <Card key={session.id}>
                         <CardContent className="pt-6">
                           <div className="flex justify-between items-center">
-                            <div>
+                            <div className="space-y-2">
                               <p className="font-semibold">Session ID: {session.id.slice(0, 8)}...</p>
                               <p className="text-sm text-muted-foreground">
                                 Status: <span className="font-medium">{session.status.toUpperCase()}</span>
@@ -536,6 +625,49 @@ const Admin = () => {
                               <p className="text-sm text-muted-foreground">
                                 Current Round: {session.current_round}
                               </p>
+                              <div className="flex items-center gap-2">
+                                <Clock className="h-4 w-4 text-primary" />
+                                <span className="text-sm font-medium">Timer: {session.time_limit_seconds}s</span>
+                                <Dialog>
+                                  <DialogTrigger asChild>
+                                    <Button size="sm" variant="ghost">
+                                      <Settings className="h-3 w-3" />
+                                    </Button>
+                                  </DialogTrigger>
+                                  <DialogContent>
+                                    <DialogHeader>
+                                      <DialogTitle>Update Timer Limit</DialogTitle>
+                                      <DialogDescription>
+                                        Set the time limit for questions in this session (in seconds)
+                                      </DialogDescription>
+                                    </DialogHeader>
+                                    <div className="py-4">
+                                      <Label>Time Limit (seconds)</Label>
+                                      <Input
+                                        type="number"
+                                        min="10"
+                                        max="300"
+                                        defaultValue={session.time_limit_seconds}
+                                        onChange={(e) => {
+                                          const value = parseInt(e.target.value) || 60;
+                                          e.currentTarget.dataset.value = value.toString();
+                                        }}
+                                      />
+                                    </div>
+                                    <DialogFooter>
+                                      <Button
+                                        onClick={(e) => {
+                                          const input = (e.currentTarget.parentElement?.parentElement?.querySelector('input') as HTMLInputElement);
+                                          const value = parseInt(input.value) || 60;
+                                          handleUpdateTimeLimit(session.id, value);
+                                        }}
+                                      >
+                                        Update
+                                      </Button>
+                                    </DialogFooter>
+                                  </DialogContent>
+                                </Dialog>
+                              </div>
                             </div>
                             <div className="flex gap-2">
                               {session.status === 'not_started' && (
@@ -592,6 +724,94 @@ const Admin = () => {
                       </Card>
                     ))}
                   </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="results">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Trophy className="h-5 w-5" />
+                  Live Results - Who Answered Correctly & Quickly
+                </CardTitle>
+                <CardDescription>
+                  {selectedSession ? 'Showing results for selected session (updates every 5 seconds)' : 'Select a session to view results'}
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="mb-4">
+                  <Label>Select Session</Label>
+                  <Select 
+                    value={selectedSession || ''} 
+                    onValueChange={(value) => setSelectedSession(value || null)}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Choose a session..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {sessions.map((session) => (
+                        <SelectItem key={session.id} value={session.id}>
+                          {session.id.slice(0, 8)}... - {session.status.toUpperCase()}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                {!selectedSession ? (
+                  <p className="text-center text-muted-foreground py-8">Select a session above to view results</p>
+                ) : questionResults.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-8">No answers submitted yet</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Rank</TableHead>
+                        <TableHead>Participant</TableHead>
+                        <TableHead>Answer</TableHead>
+                        <TableHead>Correct</TableHead>
+                        <TableHead>Time Taken</TableHead>
+                        <TableHead>Points</TableHead>
+                        <TableHead>Submitted At</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {questionResults.map((result, index) => (
+                        <TableRow key={`${result.user_id}-${result.created_at}`} className={result.is_correct ? 'bg-green-50' : ''}>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              {result.is_correct && index === 0 && <Trophy className="h-5 w-5 text-yellow-500" />}
+                              {result.is_correct && index === 1 && <Trophy className="h-5 w-5 text-gray-400" />}
+                              {result.is_correct && index === 2 && <Trophy className="h-5 w-5 text-amber-600" />}
+                              <span className="font-bold">#{index + 1}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="font-medium">{result.full_name}</TableCell>
+                          <TableCell>
+                            <span className="font-semibold">{result.answer}</span>
+                          </TableCell>
+                          <TableCell>
+                            {result.is_correct ? (
+                              <CheckCircle className="h-5 w-5 text-green-600" />
+                            ) : (
+                              <XCircle className="h-5 w-5 text-red-600" />
+                            )}
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-mono">{(result.time_taken_ms / 1000).toFixed(2)}s</span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="font-bold text-primary">{result.points_earned}</span>
+                          </TableCell>
+                          <TableCell className="text-xs text-muted-foreground">
+                            {new Date(result.created_at).toLocaleTimeString()}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
               </CardContent>
             </Card>
