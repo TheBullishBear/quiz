@@ -57,6 +57,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "participant_answers_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions_without_answers"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "participant_answers_session_id_fkey"
             columns: ["session_id"]
             isOneToOne: false
@@ -148,6 +155,7 @@ export type Database = {
           id: string
           question_start_time: string | null
           status: string
+          time_limit_seconds: number | null
           updated_at: string
         }
         Insert: {
@@ -157,6 +165,7 @@ export type Database = {
           id?: string
           question_start_time?: string | null
           status?: string
+          time_limit_seconds?: number | null
           updated_at?: string
         }
         Update: {
@@ -166,6 +175,7 @@ export type Database = {
           id?: string
           question_start_time?: string | null
           status?: string
+          time_limit_seconds?: number | null
           updated_at?: string
         }
         Relationships: [
@@ -174,6 +184,13 @@ export type Database = {
             columns: ["current_question_id"]
             isOneToOne: false
             referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_sessions_current_question_id_fkey"
+            columns: ["current_question_id"]
+            isOneToOne: false
+            referencedRelation: "questions_without_answers"
             referencedColumns: ["id"]
           },
         ]
@@ -251,7 +268,45 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      questions_without_answers: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string | null
+          option_a: string | null
+          option_b: string | null
+          option_c: string | null
+          option_d: string | null
+          question_order: number | null
+          question_text: string | null
+          round_number: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          question_order?: number | null
+          question_text?: string | null
+          round_number?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string | null
+          option_a?: string | null
+          option_b?: string | null
+          option_c?: string | null
+          option_d?: string | null
+          question_order?: number | null
+          question_text?: string | null
+          round_number?: number | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       has_role: {

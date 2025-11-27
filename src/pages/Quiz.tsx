@@ -16,6 +16,8 @@ const Quiz = () => {
   const [answer, setAnswer] = useState('');
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [submitting, setSubmitting] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number>(60);
+  const [timeLimit, setTimeLimit] = useState<number>(60);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -49,6 +51,8 @@ const Quiz = () => {
     }
 
     setSession(sessionData);
+    setTimeLimit(sessionData.time_limit_seconds || 60);
+    setTimeRemaining(sessionData.time_limit_seconds || 60);
 
     // Determine the current round from status
     const statusToRound: { [key: string]: number } = {
@@ -91,14 +95,34 @@ const Quiz = () => {
     if (nextQuestion) {
       setCurrentQuestion(nextQuestion);
       setStartTime(Date.now());
+      setTimeRemaining(sessionData.time_limit_seconds || 60);
     }
   };
 
+  // Timer countdown effect
+  useEffect(() => {
+    if (!currentQuestion || submitting) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Auto-submit when time runs out
+          handleSubmitAnswer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentQuestion, submitting]);
+
   const handleSubmitAnswer = async () => {
-    if (!answer.trim()) {
+    if (!answer.trim() && timeRemaining > 0) {
       toast({
         title: "Answer Required",
-        description: "Please enter your answer before submitting.",
+        description: "Please select your answer before submitting.",
         variant: "destructive",
       });
       return;
@@ -197,10 +221,13 @@ const Quiz = () => {
                 </CardDescription>
               </div>
               <div className="text-right">
-                <div className="text-sm text-muted-foreground">Status</div>
-                <div className="text-lg font-bold text-primary capitalize">
-                  {session.status.replace('_', ' ')}
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className={`h-5 w-5 ${timeRemaining <= 10 ? 'text-red-500 animate-pulse' : 'text-primary'}`} />
+                  <span className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-500' : 'text-primary'}`}>
+                    {timeRemaining}s
+                  </span>
                 </div>
+                <div className="text-sm text-muted-foreground">Time Remaining</div>
               </div>
             </div>
           </CardHeader>
