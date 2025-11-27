@@ -282,7 +282,7 @@ const Admin = () => {
         time_taken_ms,
         points_earned,
         created_at,
-        profiles!inner(full_name)
+        profiles!participant_answers_user_id_fkey(full_name)
       `)
       .eq('session_id', sessionId)
       .order('is_correct', { ascending: false })
