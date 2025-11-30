@@ -14,7 +14,9 @@
     "seed-session": "node scripts/setup-sample-session.js",
     "distribute-users": "node scripts/distribute-users-to-sessions.js",
     "distribute-questions": "node scripts/distribute-questions-to-sessions.js",
-    "verify-assignments": "node scripts/verify-session-assignments.js"
+    "verify-assignments": "node scripts/verify-session-assignments.js",
+    "check-invalid-questions": "node scripts/check-invalid-questions.js",
+    "check-user-permissions": "node scripts/check-user-permissions.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",

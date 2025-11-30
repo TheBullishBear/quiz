@@ -454,8 +454,41 @@ const Admin = () => {
   };
 
   const handleResetSession = async (sessionId: string) => {
-    if (!confirm('Are you sure you want to reset this quiz session? This will reset the status to "not_started" and clear the current question. Participant answers will be preserved.')) {
+    if (!confirm('Are you sure you want to reset this quiz session? This will reset the status to "not_started", clear the current question, and delete all participant answers for this session.')) {
       return;
+    }
+
+    // First, delete all participant answers for this session
+    console.log('Attempting to delete participant answers for session:', sessionId);
+    const { data: deletedAnswers, error: answersError } = await supabase
+      .from('participant_answers')
+      .delete()
+      .eq('session_id', sessionId)
+      .select('id'); // Select to get count of deleted rows
+
+    if (answersError) {
+      console.error('Error deleting participant answers:', answersError);
+      console.error('Error details:', {
+        code: answersError.code,
+        message: answersError.message,
+        details: answersError.details,
+        hint: answersError.hint
+      });
+      toast({
+        title: 'Warning',
+        description: `Failed to clear participant answers: ${answersError.message}. Please check RLS policies. Session will still be reset.`,
+        variant: 'destructive'
+      });
+    } else {
+      const deletedCount = deletedAnswers?.length || 0;
+      console.log(`✅ Cleared ${deletedCount} participant answer(s) for session:`, sessionId);
+      if (deletedCount > 0) {
+        toast({
+          title: 'Success',
+          description: `Cleared ${deletedCount} participant answer(s)`,
+          variant: 'default'
+        });
+      }
     }
 
     const { error } = await supabase
@@ -667,32 +700,135 @@ const Admin = () => {
     let updateData: any = { status };
     
     if (status === 'round_1' || status === 'round_2' || status === 'round_3' || status === 'finals') {
-      // Get the first question for this session
-      const sessionQs = sessionQuestions[sessionId] || [];
-      if (sessionQs.length > 0) {
-        // Sort by question_order and get the first one
-        const sortedQs = [...sessionQs].sort((a, b) => a.question_order - b.question_order);
-        updateData.current_question_id = sortedQs[0].question_id;
-        updateData.question_start_time = new Date().toISOString();
+      // Determine the round number from the status
+      const roundNumberMap: Record<string, number> = {
+        'round_1': 1,
+        'round_2': 2,
+        'round_3': 3,
+        'finals': 4
+      };
+      const roundNumber = roundNumberMap[status];
+      
+      // Fetch all questions for this session
+      console.log('Fetching questions for session:', sessionId, 'round:', roundNumber);
+      const { data: sessionQsData, error: fetchError } = await supabase
+        .from('session_questions')
+        .select('question_id')
+        .eq('session_id', sessionId);
+
+      if (fetchError) {
+        console.error('Error fetching session questions:', fetchError);
+        toast({
+          title: 'Warning',
+          description: 'Failed to fetch session questions. Starting session without a question.',
+          variant: 'destructive'
+        });
+      } else if (!sessionQsData || sessionQsData.length === 0) {
+        console.warn('No questions found for session:', sessionId);
+        toast({
+          title: 'Warning',
+          description: 'No questions assigned to this session. Please add questions before starting.',
+          variant: 'destructive'
+        });
+      } else {
+        // Fetch the actual questions to filter by round and order
+        const questionIds = sessionQsData.map(sq => sq.question_id);
+        console.log('Session question IDs:', questionIds);
+        
+        // First, get ALL questions to see what we have
+        const { data: allQuestionsData, error: allQuestionsError } = await supabase
+          .from('questions')
+          .select('id, round_number, question_order, question_text')
+          .in('id', questionIds);
+        
+        if (allQuestionsError) {
+          console.error('Error fetching all questions:', allQuestionsError);
+        } else {
+          console.log('All questions in session:', allQuestionsData);
+          const round1Questions = allQuestionsData?.filter(q => q.round_number === roundNumber) || [];
+          console.log(`Questions for round ${roundNumber}:`, round1Questions);
+        }
+        
+        // Now get the first question for this round
+        const { data: questionsData, error: questionsError } = await supabase
+          .from('questions')
+          .select('id, round_number, question_order, question_text')
+          .in('id', questionIds)
+          .eq('round_number', roundNumber)
+          .order('question_order', { ascending: true })
+          .limit(1);
+
+        if (questionsError) {
+          console.error('Error fetching questions:', questionsError);
+          toast({
+            title: 'Error',
+            description: `Failed to fetch questions: ${questionsError.message}`,
+            variant: 'destructive'
+          });
+          return;
+        }
+
+        if (!questionsData || questionsData.length === 0) {
+          console.warn('No questions found for round', roundNumber, 'in session:', sessionId);
+          console.log('Available question IDs in session:', questionIds);
+          toast({
+            title: 'Warning',
+            description: `No questions assigned to this session for ${status}. Please add questions for this round before starting.`,
+            variant: 'destructive'
+          });
+        } else {
+          const questionId = questionsData[0].id;
+          const questionOrder = questionsData[0].question_order;
+          
+          console.log('✅ Found first question for round:', {
+            questionId,
+            roundNumber: questionsData[0].round_number,
+            questionOrder,
+            questionText: questionsData[0].question_text?.substring(0, 50) + '...',
+            sessionId,
+            note: 'Students will see this as Question 1 (sequential numbering per session)'
+          });
+
+          updateData.current_question_id = questionId;
+          updateData.question_start_time = new Date().toISOString();
+          console.log('✅ Setting first question:', {
+            questionId,
+            roundNumber: questionsData[0].round_number,
+            questionOrder,
+            sessionId,
+            sequentialNumber: 1
+          });
+        }
       }
     }
 
-    const { error } = await supabase
+    console.log('Updating session with data:', updateData);
+    const { error, data } = await supabase
       .from('quiz_sessions')
       .update(updateData)
-      .eq('id', sessionId);
+      .eq('id', sessionId)
+      .select();
 
     if (error) {
+      console.error('Error updating session:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update session status',
+        description: `Failed to update session status: ${error.message}`,
         variant: 'destructive'
       });
     } else {
-      toast({
-        title: 'Success',
-        description: `Session ${status} successfully`
-      });
+      console.log('Session updated successfully:', data);
+      if (updateData.current_question_id) {
+        toast({
+          title: 'Success',
+          description: `Session ${status} started with question ${updateData.current_question_id}`
+        });
+      } else {
+        toast({
+          title: 'Success',
+          description: `Session ${status} successfully`
+        });
+      }
       fetchSessions();
     }
   };
@@ -721,15 +857,28 @@ const Admin = () => {
       return;
     }
 
-    // Get next question
-    const sortedQs = [...sessionQs].sort((a, b) => a.question_order - b.question_order);
-    const currentIndex = sortedQs.findIndex(q => q.question_id === session.current_question_id);
-    const nextQuestion = sortedQs[currentIndex + 1];
+    // Determine current round from session status
+    let currentRound = 1;
+    if (session.status === 'round_1') currentRound = 1;
+    else if (session.status === 'round_2') currentRound = 2;
+    else if (session.status === 'round_3') currentRound = 3;
+    else if (session.status === 'finals') currentRound = 4;
+
+    // Filter questions to only those in the current round
+    const roundQuestions = sessionQs
+      .filter(q => q.round_number === currentRound)
+      .sort((a, b) => a.question_order - b.question_order);
+    
+    // Find next question within the current round
+    const currentIndex = roundQuestions.findIndex(q => q.question_id === session.current_question_id);
+    const nextQuestion = roundQuestions[currentIndex + 1];
 
     if (!nextQuestion) {
+      // No more questions in current round
       toast({
-        title: 'Info',
-        description: 'No more questions in this session'
+        title: 'Round Complete',
+        description: `Round ${currentRound} is complete. Click "Next Round" to proceed to the next round.`,
+        variant: 'default'
       });
       return;
     }
@@ -1640,7 +1789,6 @@ const Admin = () => {
                         <TableHead>Grade</TableHead>
                         <TableHead>School</TableHead>
                         <TableHead>Status</TableHead>
-                        <TableHead>Points</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1658,7 +1806,6 @@ const Admin = () => {
                               {profile.status}
                             </span>
                           </TableCell>
-                          <TableCell className="font-bold text-primary">{profile.total_points}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
