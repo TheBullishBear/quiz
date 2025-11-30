@@ -8,7 +8,13 @@
     "build": "vite build",
     "build:dev": "vite build --mode development",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "create-admin": "node scripts/create-admin.js",
+    "seed-users": "node scripts/create-sample-users.js",
+    "seed-session": "node scripts/setup-sample-session.js",
+    "distribute-users": "node scripts/distribute-users-to-sessions.js",
+    "distribute-questions": "node scripts/distribute-questions-to-sessions.js",
+    "verify-assignments": "node scripts/verify-session-assignments.js"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -70,6 +76,7 @@
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react-swc": "^3.11.0",
     "autoprefixer": "^10.4.21",
+    "dotenv": "^17.2.3",
     "eslint": "^9.32.0",
     "eslint-plugin-react-hooks": "^5.2.0",
     "eslint-plugin-react-refresh": "^0.4.20",
