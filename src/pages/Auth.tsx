@@ -34,12 +34,21 @@ const Auth = () => {
 
     try {
       if (isLogin) {
-        const { error } = await supabase.auth.signInWithPassword({
+        const { data, error } = await supabase.auth.signInWithPassword({
           email,
           password,
         });
 
-        if (error) throw error;
+        if (error) {
+          // Provide more helpful error messages
+          if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
+            throw new Error('Invalid email or password. Please check your credentials and try again.');
+          }
+          if (error.message.includes('network') || error.message.includes('fetch')) {
+            throw new Error('Network error. Please check your internet connection and ensure Supabase is configured correctly.');
+          }
+          throw error;
+        }
 
         toast({
           title: 'Welcome back!',

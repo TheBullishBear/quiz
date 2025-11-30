@@ -30,12 +30,24 @@ const Index = () => {
     setAdminLoading(true);
 
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      const { data, error } = await supabase.auth.signInWithPassword({
         email: adminEmail,
         password: adminPassword,
       });
 
-      if (error) throw error;
+      if (error) {
+        // Provide more helpful error messages
+        if (error.message.includes('Invalid login credentials') || error.message.includes('Email not confirmed')) {
+          throw new Error('Invalid email or password. Please check your admin credentials.');
+        }
+        if (error.message.includes('network') || error.message.includes('fetch')) {
+          throw new Error('Network error. Please check your internet connection and ensure Supabase environment variables are configured correctly in Vercel.');
+        }
+        if (error.message.includes('Missing required environment variables')) {
+          throw new Error('Configuration error: Supabase environment variables are missing. Please check Vercel settings.');
+        }
+        throw error;
+      }
 
       toast({
         title: 'Admin Login Successful!',
