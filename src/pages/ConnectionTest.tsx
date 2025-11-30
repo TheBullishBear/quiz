@@ -36,14 +36,17 @@ const ConnectionTest = () => {
   const runTests = async () => {
     setIsRunning(true);
     setResults([]);
+    
+    // Use a counter to track test indices since results array is cleared
+    let testIndex = 0;
 
     // Test 1: Environment Variables
-    const envTestIndex = results.length;
     addResult({
       name: 'Environment Variables',
       status: 'pending',
       message: 'Checking environment variables...',
     });
+    const envTestIndex = testIndex++;
 
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     const supabaseKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
@@ -65,12 +68,12 @@ const ConnectionTest = () => {
     });
 
     // Test 2: Supabase Client Initialization
-    const clientTestIndex = results.length;
     addResult({
       name: 'Supabase Client',
       status: 'pending',
       message: 'Testing client initialization...',
     });
+    const clientTestIndex = testIndex++;
 
     try {
       if (!supabase) {
@@ -91,12 +94,12 @@ const ConnectionTest = () => {
     }
 
     // Test 3: Authentication Connection
-    const authTestIndex = results.length;
     addResult({
       name: 'Authentication Service',
       status: 'pending',
       message: 'Testing authentication connection...',
     });
+    const authTestIndex = testIndex++;
 
     try {
       const { data: { session }, error } = await supabase.auth.getSession();
@@ -115,12 +118,12 @@ const ConnectionTest = () => {
     }
 
     // Test 4: Database Connection - Profiles Table
-    const dbTestIndex = results.length;
     addResult({
       name: 'Database Connection',
       status: 'pending',
       message: 'Testing database connection...',
     });
+    const dbTestIndex = testIndex++;
 
     try {
       const { data, error } = await supabase
@@ -155,12 +158,12 @@ const ConnectionTest = () => {
     }
 
     // Test 5: Network Connectivity
-    const networkTestIndex = results.length;
     addResult({
       name: 'Network Connectivity',
       status: 'pending',
       message: 'Testing network connection to Supabase...',
     });
+    const networkTestIndex = testIndex++;
 
     try {
       const startTime = Date.now();
@@ -194,12 +197,12 @@ const ConnectionTest = () => {
     // Test 6: Test Query with Authentication (if logged in)
     const { data: { session } } = await supabase.auth.getSession();
     if (session) {
-      const authQueryTestIndex = results.length;
       addResult({
         name: 'Authenticated Query',
         status: 'pending',
         message: 'Testing authenticated database query...',
       });
+      const authQueryTestIndex = testIndex++;
 
       try {
         const { data, error } = await supabase

@@ -185,10 +185,34 @@ Before deploying to Vercel, ensure:
 - [ ] `VITE_SUPABASE_PUBLISHABLE_KEY` is set in Vercel environment variables
 - [ ] Both variables have the `VITE_` prefix
 - [ ] Variables are set for Production environment
+- [ ] `vercel.json` file exists in project root (for client-side routing)
 - [ ] Admin user exists in production Supabase instance
 - [ ] Admin user has `admin` role in `user_roles` table
 - [ ] Admin user's profile status is `approved`
 - [ ] After setting variables, you've redeployed the application
+
+## Client-Side Routing Configuration
+
+This project uses React Router with `BrowserRouter` for client-side routing. Vercel needs to be configured to handle these routes properly.
+
+### Required: vercel.json
+
+The project includes a `vercel.json` file that configures Vercel to redirect all routes to `index.html`, allowing React Router to handle routing client-side.
+
+**Important:** Make sure `vercel.json` is committed to your repository. It should contain:
+
+```json
+{
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}
+```
+
+If routes like `/test-connection`, `/admin`, `/dashboard` etc. return 404 errors, it means `vercel.json` is missing or not properly configured.
 
 ## Troubleshooting Steps
 
