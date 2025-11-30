@@ -139,11 +139,35 @@ The admin user must be created in your **production Supabase instance**, not jus
 
 ## Verifying Configuration
 
+### Using the Connection Test Page
+
+The easiest way to verify your connection is to use the built-in connection test page:
+
+1. **Navigate to the test page:**
+   - Go to: `https://your-vercel-app.vercel.app/test-connection`
+   - Or add `/test-connection` to your deployed app URL
+
+2. **Run the tests:**
+   - Click the "Run Tests" button
+   - The page will automatically check:
+     - Environment variables configuration
+     - Supabase client initialization
+     - Authentication service connectivity
+     - Database connection
+     - Network connectivity
+     - Authenticated queries (if logged in)
+
+3. **Review results:**
+   - Green checkmarks = Success
+   - Red X marks = Error (check the details)
+   - The page shows specific error messages to help you troubleshoot
+
 ### Check Environment Variables
 
 1. After deployment, check the browser console (F12)
 2. Look for any errors about missing environment variables
 3. The app will throw an error if `VITE_SUPABASE_URL` or `VITE_SUPABASE_PUBLISHABLE_KEY` are missing
+4. Or use the connection test page (see above)
 
 ### Test Supabase Connection
 
@@ -151,6 +175,7 @@ The admin user must be created in your **production Supabase instance**, not jus
 2. Try logging in
 3. Check for network errors in the Network tab
 4. Verify requests are going to the correct Supabase URL
+5. Or use the connection test page for automated testing
 
 ## Deployment Checklist
 
