@@ -1,19 +1,65 @@
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { Trophy, Sparkles, Zap, Users } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Trophy, Sparkles, Zap, Users, Shield } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/hooks/use-toast';
 import heroImage from '@/assets/quiz-hero.jpg';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user, loading } = useAuth();
+  const { toast } = useToast();
+  const [adminEmail, setAdminEmail] = useState('');
+  const [adminPassword, setAdminPassword] = useState('');
+  const [adminLoading, setAdminLoading] = useState(false);
+  const [adminDialogOpen, setAdminDialogOpen] = useState(false);
 
   useEffect(() => {
     if (!loading && user) {
       navigate('/dashboard');
     }
   }, [user, loading, navigate]);
+
+  const handleAdminLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setAdminLoading(true);
+
+    try {
+      const { error } = await supabase.auth.signInWithPassword({
+        email: adminEmail,
+        password: adminPassword,
+      });
+
+      if (error) throw error;
+
+      toast({
+        title: 'Admin Login Successful!',
+        description: 'Redirecting to admin dashboard...',
+      });
+      
+      setAdminDialogOpen(false);
+      setAdminEmail('');
+      setAdminPassword('');
+      
+      // Small delay to show toast, then navigate
+      setTimeout(() => {
+        navigate('/admin');
+      }, 500);
+    } catch (error: any) {
+      toast({
+        title: 'Login Failed',
+        description: error.message || 'Invalid email or password',
+        variant: 'destructive',
+      });
+    } finally {
+      setAdminLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -74,6 +120,75 @@ const Index = () => {
               >
                 Sign In
               </Button>
+            </div>
+            
+            <div className="flex justify-center pt-4">
+              <Dialog open={adminDialogOpen} onOpenChange={setAdminDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="text-sm text-muted-foreground hover:text-foreground"
+                  >
+                    <Shield className="mr-2 h-4 w-4" />
+                    Admin Login
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                      <Shield className="h-5 w-5 text-primary" />
+                      Admin Login
+                    </DialogTitle>
+                    <DialogDescription>
+                      Enter your admin credentials to access the admin dashboard
+                    </DialogDescription>
+                  </DialogHeader>
+                  <form onSubmit={handleAdminLogin} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-email">Email</Label>
+                      <Input
+                        id="admin-email"
+                        type="email"
+                        placeholder="admin@example.com"
+                        value={adminEmail}
+                        onChange={(e) => setAdminEmail(e.target.value)}
+                        required
+                        disabled={adminLoading}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="admin-password">Password</Label>
+                      <Input
+                        id="admin-password"
+                        type="password"
+                        placeholder="••••••••"
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        required
+                        disabled={adminLoading}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={() => {
+                          setAdminDialogOpen(false);
+                          setAdminEmail('');
+                          setAdminPassword('');
+                        }}
+                        disabled={adminLoading}
+                      >
+                        Cancel
+                      </Button>
+                      <Button type="submit" disabled={adminLoading}>
+                        {adminLoading ? 'Logging in...' : 'Login'}
+                      </Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
             </div>
           </div>
         </div>
