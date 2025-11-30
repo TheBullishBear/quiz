@@ -10,6 +10,34 @@ The easiest way to test your connection is to visit the connection test page:
 
 Simply navigate to this URL in your browser and click "Run Tests" to verify all connections.
 
+### Troubleshooting: Page Not Found (404)
+
+If you get a 404 error when accessing `/test-connection` on Vercel:
+
+1. **Check for `vercel.json` file:**
+   - The project root should have a `vercel.json` file
+   - This file is required for client-side routing to work on Vercel
+
+2. **Verify `vercel.json` content:**
+   ```json
+   {
+     "rewrites": [
+       {
+         "source": "/(.*)",
+         "destination": "/index.html"
+       }
+     ]
+   }
+   ```
+
+3. **Redeploy after adding `vercel.json`:**
+   - Commit the `vercel.json` file to your repository
+   - Vercel will automatically redeploy, or trigger a manual redeploy
+
+4. **Check Vercel build logs:**
+   - Ensure the build completes successfully
+   - Check that `vercel.json` is included in the deployment
+
 ## What Gets Tested
 
 The connection test page automatically checks:
