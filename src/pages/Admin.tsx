@@ -33,6 +33,7 @@ interface Question {
   correct_answer: string;
   round_number: number;
   question_order: number;
+  image_url?: string;
 }
 
 interface QuizSession {
@@ -77,6 +78,8 @@ const Admin = () => {
     round_number: 1,
     question_order: 1
   });
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [imagePreview, setImagePreview] = useState<string>('');
 
   useEffect(() => {
     if (!loading && (!user || !isAdmin)) {
@@ -150,19 +153,51 @@ const Admin = () => {
   };
 
   const handleAddQuestion = async () => {
-    if (!newQuestion.question_text || !newQuestion.option_a || !newQuestion.option_b || 
+    // Allow either question_text OR image_file, but require options
+    if ((!newQuestion.question_text && !imageFile) || !newQuestion.option_a || !newQuestion.option_b || 
         !newQuestion.option_c || !newQuestion.option_d) {
       toast({
         title: 'Error',
-        description: 'Please fill in the question and all 4 options',
+        description: 'Please provide a question (text or image) and all 4 options',
         variant: 'destructive'
       });
       return;
     }
 
+    let imageUrl = '';
+
+    // Upload image if provided
+    if (imageFile) {
+      const fileExt = imageFile.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2)}_${Date.now()}.${fileExt}`;
+      const filePath = `${fileName}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from('question-images')
+        .upload(filePath, imageFile);
+
+      if (uploadError) {
+        toast({
+          title: 'Error',
+          description: 'Failed to upload image',
+          variant: 'destructive'
+        });
+        return;
+      }
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('question-images')
+        .getPublicUrl(filePath);
+
+      imageUrl = publicUrl;
+    }
+
     const { error } = await supabase
       .from('questions')
-      .insert([newQuestion]);
+      .insert([{
+        ...newQuestion,
+        image_url: imageUrl || null
+      }]);
 
     if (error) {
       toast({
@@ -185,6 +220,8 @@ const Admin = () => {
         round_number: 1,
         question_order: 1
       });
+      setImageFile(null);
+      setImagePreview('');
       fetchQuestions();
     }
   };
@@ -446,12 +483,52 @@ const Admin = () => {
                     </div>
                   </div>
                   <div>
-                    <Label>Question Text</Label>
+                    <Label>Question Text (or upload image below)</Label>
                     <Input
                       value={newQuestion.question_text}
                       onChange={(e) => setNewQuestion({ ...newQuestion, question_text: e.target.value })}
-                      placeholder="Enter question text"
+                      placeholder="Enter question text (optional if image is provided)"
                     />
+                  </div>
+                  <div>
+                    <Label>Question Image (optional)</Label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          setImageFile(file);
+                          const reader = new FileReader();
+                          reader.onloadend = () => {
+                            setImagePreview(reader.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="cursor-pointer"
+                    />
+                    {imagePreview && (
+                      <div className="mt-4 relative">
+                        <img 
+                          src={imagePreview} 
+                          alt="Question preview" 
+                          className="max-h-48 rounded-lg border"
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="destructive"
+                          className="absolute top-2 right-2"
+                          onClick={() => {
+                            setImageFile(null);
+                            setImagePreview('');
+                          }}
+                        >
+                          Remove
+                        </Button>
+                      </div>
+                    )}
                   </div>
                   <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -527,6 +604,7 @@ const Admin = () => {
                           <TableHead>Round</TableHead>
                           <TableHead>Order</TableHead>
                           <TableHead>Question</TableHead>
+                          <TableHead>Image</TableHead>
                           <TableHead>Options</TableHead>
                           <TableHead>Correct</TableHead>
                           <TableHead>Actions</TableHead>
@@ -537,7 +615,16 @@ const Admin = () => {
                           <TableRow key={question.id}>
                             <TableCell>Round {question.round_number}</TableCell>
                             <TableCell>#{question.question_order}</TableCell>
-                            <TableCell className="max-w-md truncate">{question.question_text}</TableCell>
+                            <TableCell className="max-w-md truncate">{question.question_text || '(Image Question)'}</TableCell>
+                            <TableCell>
+                              {question.image_url && (
+                                <img 
+                                  src={question.image_url} 
+                                  alt="Question" 
+                                  className="h-16 w-16 object-cover rounded"
+                                />
+                              )}
+                            </TableCell>
                             <TableCell className="text-xs">
                               <div className="space-y-1">
                                 <div>A: {question.option_a}</div>

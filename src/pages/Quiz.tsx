@@ -233,9 +233,17 @@ const Quiz = () => {
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-muted/50 p-6 rounded-lg">
-              <p className="text-lg font-medium leading-relaxed">
-                {currentQuestion.question_text}
-              </p>
+              {currentQuestion.image_url ? (
+                <img 
+                  src={currentQuestion.image_url} 
+                  alt="Question" 
+                  className="w-full max-h-96 object-contain rounded-lg"
+                />
+              ) : (
+                <p className="text-lg font-medium leading-relaxed">
+                  {currentQuestion.question_text}
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
