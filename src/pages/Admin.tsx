@@ -379,6 +379,29 @@ const Admin = () => {
     }
   };
 
+  const handleRemoveUser = async (userId: string) => {
+    // Delete the user's profile (cascades to related data)
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', userId);
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to remove user: ' + error.message,
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'User removed successfully'
+      });
+      fetchAllProfiles();
+      fetchPendingProfiles();
+    }
+  };
+
   const handleCreateSession = async () => {
     if (!newSessionName.trim()) {
       toast({
@@ -1789,6 +1812,7 @@ const Admin = () => {
                         <TableHead>Grade</TableHead>
                         <TableHead>School</TableHead>
                         <TableHead>Status</TableHead>
+                        <TableHead>Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -1805,6 +1829,30 @@ const Admin = () => {
                             }`}>
                               {profile.status}
                             </span>
+                          </TableCell>
+                          <TableCell>
+                            <Dialog>
+                              <DialogTrigger asChild>
+                                <Button size="sm" variant="destructive">
+                                  <Trash2 className="h-4 w-4 mr-1" />
+                                  Remove
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent>
+                                <DialogHeader>
+                                  <DialogTitle>Remove User</DialogTitle>
+                                  <DialogDescription>
+                                    Are you sure you want to remove <strong>{profile.full_name}</strong> from the game? This will delete their profile and all associated data. This action cannot be undone.
+                                  </DialogDescription>
+                                </DialogHeader>
+                                <DialogFooter>
+                                  <Button variant="outline">Cancel</Button>
+                                  <Button variant="destructive" onClick={() => handleRemoveUser(profile.id)}>
+                                    Remove User
+                                  </Button>
+                                </DialogFooter>
+                              </DialogContent>
+                            </Dialog>
                           </TableCell>
                         </TableRow>
                       ))}

@@ -155,7 +155,9 @@ export type Database = {
           created_at: string
           current_question_id: string | null
           current_round: number
+          group_name: string | null
           id: string
+          name: string | null
           question_start_time: string | null
           status: string
           time_limit_seconds: number | null
@@ -165,7 +167,9 @@ export type Database = {
           created_at?: string
           current_question_id?: string | null
           current_round?: number
+          group_name?: string | null
           id?: string
+          name?: string | null
           question_start_time?: string | null
           status?: string
           time_limit_seconds?: number | null
@@ -175,7 +179,9 @@ export type Database = {
           created_at?: string
           current_question_id?: string | null
           current_round?: number
+          group_name?: string | null
           id?: string
+          name?: string | null
           question_start_time?: string | null
           status?: string
           time_limit_seconds?: number | null
@@ -194,6 +200,81 @@ export type Database = {
             columns: ["current_question_id"]
             isOneToOne: false
             referencedRelation: "questions_without_answers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_questions: {
+        Row: {
+          created_at: string
+          id: string
+          question_id: string
+          question_order: number
+          session_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          question_id: string
+          question_order?: number
+          session_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          question_id?: string
+          question_order?: number
+          session_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_questions_question_id_fkey"
+            columns: ["question_id"]
+            isOneToOne: false
+            referencedRelation: "questions_without_answers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "session_questions_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      session_users: {
+        Row: {
+          created_at: string
+          id: string
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "session_users_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "quiz_sessions"
             referencedColumns: ["id"]
           },
         ]
