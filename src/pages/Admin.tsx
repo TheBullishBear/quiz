@@ -981,6 +981,30 @@ const Admin = () => {
     }
   };
 
+  const handleResetLeaderboard = async () => {
+    // Reset all total_points to 0 for all profiles
+    // Supabase requires a WHERE clause, so we use a condition that matches all rows
+    // Using gte on total_points (which is always >= 0) ensures we match all existing profiles
+    const { error } = await supabase
+      .from('profiles')
+      .update({ total_points: 0 })
+      .gte('total_points', 0); // This matches all rows since points are always >= 0
+
+    if (error) {
+      toast({
+        title: 'Error',
+        description: 'Failed to reset leaderboard: ' + error.message,
+        variant: 'destructive'
+      });
+    } else {
+      toast({
+        title: 'Success',
+        description: 'All points in the leaderboard have been reset to 0'
+      });
+      fetchAllProfiles();
+    }
+  };
+
   useEffect(() => {
     if (selectedSession) {
       fetchQuestionResults(selectedSession);
@@ -1866,11 +1890,37 @@ const Admin = () => {
           <TabsContent value="leaderboard">
             <Card>
               <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Award className="h-5 w-5" />
-                  Leaderboard
-                </CardTitle>
-                <CardDescription>Top performers in the quiz competition</CardDescription>
+                <div className="flex justify-between items-start">
+                  <div>
+                    <CardTitle className="flex items-center gap-2">
+                      <Award className="h-5 w-5" />
+                      Leaderboard
+                    </CardTitle>
+                    <CardDescription>Top performers in the quiz competition</CardDescription>
+                  </div>
+                  <Dialog>
+                    <DialogTrigger asChild>
+                      <Button variant="destructive" size="sm">
+                        <RotateCcw className="h-4 w-4 mr-2" />
+                        Reset All Points
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Reset Leaderboard</DialogTitle>
+                        <DialogDescription>
+                          Are you sure you want to reset all points in the leaderboard? This will set all participants' points to 0. This action cannot be undone.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => {}}>Cancel</Button>
+                        <Button variant="destructive" onClick={handleResetLeaderboard}>
+                          Reset All Points
+                        </Button>
+                      </DialogFooter>
+                    </DialogContent>
+                  </Dialog>
+                </div>
               </CardHeader>
               <CardContent>
                 {allProfiles.filter(p => p.status === 'approved').length === 0 ? (

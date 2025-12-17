@@ -28,6 +28,37 @@ const Quiz = () => {
   useEffect(() => {
     if (user) {
       fetchActiveSession();
+      
+      // Set up real-time subscription to listen for session changes
+      const channel = supabase
+        .channel('quiz-session-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: 'UPDATE',
+            schema: 'public',
+            table: 'quiz_sessions',
+            filter: `status=neq.completed`
+          },
+          (payload) => {
+            // Update session state and fetch the current question
+            const updatedSession = payload.new as any;
+            setSession(updatedSession);
+            setTimeLimit(updatedSession.time_limit_seconds || 60);
+            fetchCurrentQuestion(updatedSession);
+          }
+        )
+        .subscribe();
+
+      // Also poll every 3 seconds as a fallback (in case real-time doesn't work)
+      const pollInterval = setInterval(() => {
+        fetchActiveSession();
+      }, 3000);
+
+      return () => {
+        supabase.removeChannel(channel);
+        clearInterval(pollInterval);
+      };
     }
   }, [user]);
 
@@ -52,7 +83,16 @@ const Quiz = () => {
 
     setSession(sessionData);
     setTimeLimit(sessionData.time_limit_seconds || 60);
-    setTimeRemaining(sessionData.time_limit_seconds || 60);
+    
+    // Fetch the current question based on admin's selection
+    await fetchCurrentQuestion(sessionData);
+  };
+
+  const fetchCurrentQuestion = async (sessionData: any) => {
+    if (!sessionData || !sessionData.current_question_id) {
+      setCurrentQuestion(null);
+      return;
+    }
 
     // Determine the current round from status
     const statusToRound: { [key: string]: number } = {
@@ -66,56 +106,50 @@ const Quiz = () => {
     
     if (!currentRound) {
       // Quiz hasn't started yet
+      setCurrentQuestion(null);
       return;
     }
 
-    // Fetch ONLY admin-selected questions for this session from session_questions
-    const { data: sessionQuestions } = await supabase
-      .from('session_questions')
-      .select('question_id, question_order')
-      .eq('session_id', sessionData.id)
-      .order('question_order', { ascending: true });
-
-    if (!sessionQuestions || sessionQuestions.length === 0) {
-      return;
-    }
-
-    const questionIds = sessionQuestions.map(sq => sq.question_id);
-
-    // Fetch question details (without answers) for selected questions only
-    const { data: roundQuestions } = await supabase
+    // Fetch the specific question that admin has set as current
+    const { data: questionData } = await supabase
       .from('questions_without_answers')
       .select('*')
-      .in('id', questionIds);
+      .eq('id', sessionData.current_question_id)
+      .maybeSingle();
 
-    if (!roundQuestions || roundQuestions.length === 0) {
+    if (!questionData) {
+      setCurrentQuestion(null);
       return;
     }
 
-    // Sort questions by session_questions order
-    const orderMap = new Map(sessionQuestions.map(sq => [sq.question_id, sq.question_order]));
-    const sortedQuestions = roundQuestions.sort((a, b) => 
-      (orderMap.get(a.id) || 0) - (orderMap.get(b.id) || 0)
-    );
-
-    // Fetch user's answers for this session
-    const { data: userAnswers } = await supabase
+    // Check if user has already answered this question
+    const { data: userAnswer } = await supabase
       .from('participant_answers')
-      .select('question_id')
+      .select('id')
       .eq('user_id', user!.id)
-      .eq('session_id', sessionData.id);
+      .eq('session_id', sessionData.id)
+      .eq('question_id', sessionData.current_question_id)
+      .maybeSingle();
 
-    const answeredQuestionIds = new Set(userAnswers?.map(a => a.question_id) || []);
-
-    // Find the first unanswered question
-    const nextQuestion = sortedQuestions.find(q => !answeredQuestionIds.has(q.id));
-
-    if (nextQuestion) {
-      setCurrentQuestion(nextQuestion);
+    // Only show the question if it's the current one and user hasn't answered it yet
+    if (!userAnswer) {
+      setCurrentQuestion(questionData);
       setStartTime(Date.now());
       setTimeRemaining(sessionData.time_limit_seconds || 60);
+      setAnswer(''); // Reset answer when new question is shown
+    } else {
+      // User has already answered this question, wait for admin to advance
+      setCurrentQuestion(null);
     }
   };
+
+  // Reset timer when question changes
+  useEffect(() => {
+    if (currentQuestion && session) {
+      setTimeRemaining(session.time_limit_seconds || 60);
+      setStartTime(Date.now());
+    }
+  }, [currentQuestion?.id, session?.id]);
 
   // Timer countdown effect
   useEffect(() => {
@@ -134,7 +168,7 @@ const Quiz = () => {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentQuestion, submitting]);
+  }, [currentQuestion?.id, submitting]);
 
   const handleSubmitAnswer = async () => {
     if (!answer.trim() && timeRemaining > 0) {
@@ -164,14 +198,14 @@ const Quiz = () => {
 
       toast({
         title: "Answer Submitted!",
-        description: "Your answer has been recorded successfully.",
+        description: "Your answer has been recorded. Waiting for the next question...",
       });
 
       setAnswer('');
       setCurrentQuestion(null);
       
-      // Fetch next question automatically
-      await fetchActiveSession();
+      // Don't automatically fetch next question - wait for admin to advance
+      // The real-time subscription will update when admin clicks "Next Question"
     } catch (error: any) {
       toast({
         title: "Submission Failed",
