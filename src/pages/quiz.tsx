@@ -27,6 +27,7 @@ const Quiz = () => {
   const isResettingRef = useRef(false);
   const lastQuestionIdRef = useRef<string | null>(null);
   const lastSessionUpdatedAtRef = useRef<string | null>(null);
+  const isLoadingQuestionRef = useRef(false); // Track if we're currently loading a question
 
   useEffect(() => {
     if (!loading && !user) {
@@ -35,25 +36,22 @@ const Quiz = () => {
   }, [user, loading, navigate]);
 
   useEffect(() => {
-    if (user) {
-      fetchActiveSession();
-      
-      // Set up smart polling:
-      // - If no question: poll every 3 seconds (waiting for question)
-      // - If has question: poll every 10 seconds (much less frequent to reduce reload feeling)
-      //   Only need to check for new questions or round completion
-      const pollInterval = currentQuestion ? 10000 : 3000;
-      
-      const interval = setInterval(() => {
-        // Only poll if not in the middle of a reset
-        if (!isResettingRef.current) {
-          fetchActiveSession();
-        }
-      }, pollInterval);
+    if (!user) return;
+    
+    // Initial fetch
+    fetchActiveSession();
+    
+    // Use a stable polling interval that doesn't change based on state
+    // This prevents the effect from re-running and creating multiple intervals
+    const interval = setInterval(() => {
+      // Only poll if not in the middle of a reset
+      if (!isResettingRef.current) {
+        fetchActiveSession();
+      }
+    }, 5000); // Fixed 5 second interval - balanced between responsiveness and stability
 
-      return () => clearInterval(interval);
-    }
-  }, [user, currentQuestion]); // Adjust polling frequency based on whether we have a question
+    return () => clearInterval(interval);
+  }, [user]); // Only depend on user, not currentQuestion
 
   // Watch for session version changes - when version changes, clear everything
   useEffect(() => {
@@ -71,34 +69,50 @@ const Quiz = () => {
   }, [sessionVersion]);
 
   // Watch for question ID changes and force state reset if needed
+  // Use ref to track previous question ID to avoid unnecessary clears
+  const previousQuestionIdFromSessionRef = useRef<string | null>(null);
+  
   useEffect(() => {
-    if (session?.current_question_id) {
-      // If we have a current question in state but it doesn't match the session's question ID, clear it
-      if (currentQuestion && currentQuestion.id !== session.current_question_id) {
+    const sessionQuestionId = session?.current_question_id;
+    
+    // Only act if the session question ID actually changed
+    if (previousQuestionIdFromSessionRef.current === sessionQuestionId) {
+      return; // No change, skip
+    }
+    
+    previousQuestionIdFromSessionRef.current = sessionQuestionId;
+    
+    if (sessionQuestionId) {
+      // Session has a question ID
+      // Only clear if we have a different question loaded
+      if (currentQuestion && currentQuestion.id !== sessionQuestionId && lastQuestionIdRef.current !== sessionQuestionId) {
         console.log('Question ID mismatch detected - clearing state:', {
           stateQuestionId: currentQuestion.id,
-          sessionQuestionId: session.current_question_id
+          sessionQuestionId: sessionQuestionId
         });
         setCurrentQuestion(null);
         setHasAnsweredCurrent(false);
         setAnswer('');
         setTimeRemaining(null);
         setStartTime(Date.now());
-        setAnsweredQuestions(new Set()); // Clear answered questions
-        setSessionQuestions([]); // Clear session questions
+        setAnsweredQuestions(new Set());
+        setSessionQuestions([]);
         lastQuestionIdRef.current = null;
       }
     } else if (currentQuestion) {
-      // If session has no question ID but we have a question in state, clear it
-      console.log('Session has no question but state does - clearing ALL state');
-      setCurrentQuestion(null);
-      setHasAnsweredCurrent(false);
-      setAnswer('');
-      setTimeRemaining(null);
-      setStartTime(Date.now());
-      setAnsweredQuestions(new Set()); // Clear answered questions
-      setSessionQuestions([]); // Clear session questions
-      lastQuestionIdRef.current = null;
+      // Session has no question ID but we have a question in state
+      // Only clear if this is a real change (not just initial load)
+      if (lastQuestionIdRef.current !== null) {
+        console.log('Session question cleared - clearing state');
+        setCurrentQuestion(null);
+        setHasAnsweredCurrent(false);
+        setAnswer('');
+        setTimeRemaining(null);
+        setStartTime(Date.now());
+        setAnsweredQuestions(new Set());
+        setSessionQuestions([]);
+        lastQuestionIdRef.current = null;
+      }
     }
   }, [session?.current_question_id, currentQuestion]);
 
@@ -390,6 +404,12 @@ const Quiz = () => {
           return;
         }
         
+        // If we're already loading this question, skip to prevent duplicate loads
+        if (isLoadingQuestionRef.current && lastQuestionIdRef.current === sessionData.current_question_id) {
+          console.log('Already loading this question, skipping duplicate fetch');
+          return;
+        }
+        
         // If we're resetting, clear the reset flag after we start loading
         if (isResettingRef.current) {
           console.log('Processing question after reset - will clear reset flag after load');
@@ -455,6 +475,9 @@ const Quiz = () => {
         // we can proceed to fetch the question
         // The state should already be cleared if isDifferentQuestion was true
         if (isDifferentQuestion) {
+          // Mark that we're loading to prevent duplicate fetches
+          isLoadingQuestionRef.current = true;
+          
           console.log('Fetching new question:', {
             questionId: sessionData.current_question_id,
             previousQuestionId: currentQuestion?.id,
@@ -499,6 +522,7 @@ const Quiz = () => {
             }
             setCurrentQuestion(null);
             setHasAnsweredCurrent(false);
+            isLoadingQuestionRef.current = false; // Mark loading as complete (even on error)
             return;
           }
 
@@ -511,6 +535,7 @@ const Quiz = () => {
               });
               setCurrentQuestion(null);
               setHasAnsweredCurrent(false);
+              isLoadingQuestionRef.current = false; // Mark loading as complete (even on error)
               return;
             }
 
@@ -539,6 +564,7 @@ const Quiz = () => {
             }
             
             lastQuestionIdRef.current = questionData.id; // Update ref to track current question
+            isLoadingQuestionRef.current = false; // Mark loading as complete
             
             // Set time remaining from session
             if (sessionData.time_limit_seconds) {
@@ -555,6 +581,7 @@ const Quiz = () => {
             });
             setCurrentQuestion(null);
             setHasAnsweredCurrent(false);
+            isLoadingQuestionRef.current = false; // Mark loading as complete (even on error)
           }
         } else {
           // Same question - just update the answered status if it changed
@@ -582,6 +609,7 @@ const Quiz = () => {
       }
     } catch (error: any) {
       console.error('Unexpected error in fetchActiveSession:', error);
+      isLoadingQuestionRef.current = false; // Mark loading as complete (even on error)
       toast({
         title: "Error",
         description: "An unexpected error occurred.",

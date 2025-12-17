@@ -28,35 +28,62 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          setTimeout(() => {
+    let mounted = true;
+
+    try {
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          if (!mounted) return;
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
+            setTimeout(() => {
+              checkUserRole(session.user.id);
+              checkApprovalStatus(session.user.id);
+            }, 0);
+          } else {
+            setIsAdmin(false);
+            setIsApproved(false);
+          }
+        }
+      );
+
+      supabase.auth.getSession()
+        .then(({ data: { session }, error }) => {
+          if (!mounted) return;
+          if (error) {
+            console.error('Error getting session:', error);
+            setLoading(false);
+            return;
+          }
+          setSession(session);
+          setUser(session?.user ?? null);
+          
+          if (session?.user) {
             checkUserRole(session.user.id);
             checkApprovalStatus(session.user.id);
-          }, 0);
-        } else {
-          setIsAdmin(false);
-          setIsApproved(false);
-        }
-      }
-    );
+          }
+          setLoading(false);
+        })
+        .catch((error) => {
+          console.error('Error initializing auth:', error);
+          if (mounted) {
+            setLoading(false);
+          }
+        });
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        checkUserRole(session.user.id);
-        checkApprovalStatus(session.user.id);
-      }
+      return () => {
+        mounted = false;
+        subscription.unsubscribe();
+      };
+    } catch (error) {
+      console.error('Error setting up auth:', error);
       setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
+      return () => {
+        mounted = false;
+      };
+    }
   }, []);
 
   const checkUserRole = async (userId: string) => {
