@@ -10,7 +10,7 @@ The error suggests:
 
 ## Solution: Repair Migration History
 
-You have two options:
+You have two options:-
 
 ### Option 1: Repair via CLI (Recommended)
 
