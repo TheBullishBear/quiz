@@ -16,6 +16,8 @@ const Quiz = () => {
   const [answer, setAnswer] = useState('');
   const [startTime, setStartTime] = useState<number>(Date.now());
   const [submitting, setSubmitting] = useState(false);
+  const [timeRemaining, setTimeRemaining] = useState<number>(60);
+  const [timeLimit, setTimeLimit] = useState<number>(60);
 
   useEffect(() => {
     if (!loading && !user) {
@@ -36,7 +38,7 @@ const Quiz = () => {
       .neq('status', 'completed')
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      .maybeSingle();
 
     if (!sessionData) {
       toast({
@@ -49,24 +51,78 @@ const Quiz = () => {
     }
 
     setSession(sessionData);
+    setTimeLimit(sessionData.time_limit_seconds || 60);
+    setTimeRemaining(sessionData.time_limit_seconds || 60);
 
-    if (sessionData.current_question_id) {
-      const { data: questionData } = await supabase
-        .from('questions')
-        .select('*')
-        .eq('id', sessionData.current_question_id)
-        .single();
+    // Determine the current round from status
+    const statusToRound: { [key: string]: number } = {
+      'round_1': 1,
+      'round_2': 2,
+      'round_3': 3,
+      'finals': 4,
+    };
 
-      setCurrentQuestion(questionData);
+    const currentRound = statusToRound[sessionData.status];
+    
+    if (!currentRound) {
+      // Quiz hasn't started yet
+      return;
+    }
+
+    // Fetch all questions for the current round (without answers)
+    const { data: roundQuestions } = await supabase
+      .from('questions_without_answers')
+      .select('*')
+      .eq('round_number', currentRound)
+      .order('question_order', { ascending: true });
+
+    if (!roundQuestions || roundQuestions.length === 0) {
+      return;
+    }
+
+    // Fetch user's answers for this session
+    const { data: userAnswers } = await supabase
+      .from('participant_answers')
+      .select('question_id')
+      .eq('user_id', user!.id)
+      .eq('session_id', sessionData.id);
+
+    const answeredQuestionIds = new Set(userAnswers?.map(a => a.question_id) || []);
+
+    // Find the first unanswered question
+    const nextQuestion = roundQuestions.find(q => !answeredQuestionIds.has(q.id));
+
+    if (nextQuestion) {
+      setCurrentQuestion(nextQuestion);
       setStartTime(Date.now());
+      setTimeRemaining(sessionData.time_limit_seconds || 60);
     }
   };
 
+  // Timer countdown effect
+  useEffect(() => {
+    if (!currentQuestion || submitting) return;
+
+    const interval = setInterval(() => {
+      setTimeRemaining((prev) => {
+        if (prev <= 1) {
+          clearInterval(interval);
+          // Auto-submit when time runs out
+          handleSubmitAnswer();
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [currentQuestion, submitting]);
+
   const handleSubmitAnswer = async () => {
-    if (!answer.trim()) {
+    if (!answer.trim() && timeRemaining > 0) {
       toast({
         title: "Answer Required",
-        description: "Please enter your answer before submitting.",
+        description: "Please select your answer before submitting.",
         variant: "destructive",
       });
       return;
@@ -165,29 +221,64 @@ const Quiz = () => {
                 </CardDescription>
               </div>
               <div className="text-right">
-                <div className="text-sm text-muted-foreground">Status</div>
-                <div className="text-lg font-bold text-primary capitalize">
-                  {session.status.replace('_', ' ')}
+                <div className="flex items-center gap-2 mb-2">
+                  <Clock className={`h-5 w-5 ${timeRemaining <= 10 ? 'text-red-500 animate-pulse' : 'text-primary'}`} />
+                  <span className={`text-2xl font-bold ${timeRemaining <= 10 ? 'text-red-500' : 'text-primary'}`}>
+                    {timeRemaining}s
+                  </span>
                 </div>
+                <div className="text-sm text-muted-foreground">Time Remaining</div>
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
             <div className="bg-muted/50 p-6 rounded-lg">
-              <p className="text-lg font-medium leading-relaxed">
-                {currentQuestion.question_text}
-              </p>
+              {currentQuestion.image_url ? (
+                <img 
+                  src={currentQuestion.image_url} 
+                  alt="Question" 
+                  className="w-full max-h-96 object-contain rounded-lg"
+                />
+              ) : (
+                <p className="text-lg font-medium leading-relaxed">
+                  {currentQuestion.question_text}
+                </p>
+              )}
             </div>
 
             <div className="space-y-4">
-              <label className="text-sm font-medium">Your Answer</label>
-              <textarea
-                value={answer}
-                onChange={(e) => setAnswer(e.target.value)}
-                placeholder="Type your answer here..."
-                className="w-full min-h-[150px] p-4 rounded-lg border border-border bg-background resize-none focus:outline-none focus:ring-2 focus:ring-primary"
-                disabled={submitting}
-              />
+              <label className="text-sm font-medium">Select Your Answer</label>
+              <div className="space-y-3">
+                {[
+                  { value: 'A', text: currentQuestion.option_a },
+                  { value: 'B', text: currentQuestion.option_b },
+                  { value: 'C', text: currentQuestion.option_c },
+                  { value: 'D', text: currentQuestion.option_d }
+                ].map((option) => (
+                  <label
+                    key={option.value}
+                    className={`flex items-start gap-3 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                      answer === option.value
+                        ? 'border-primary bg-primary/5'
+                        : 'border-border hover:border-primary/50 hover:bg-muted/50'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="answer"
+                      value={option.value}
+                      checked={answer === option.value}
+                      onChange={(e) => setAnswer(e.target.value)}
+                      disabled={submitting}
+                      className="mt-1 h-4 w-4 text-primary"
+                    />
+                    <div className="flex-1">
+                      <span className="font-semibold text-primary mr-2">{option.value}.</span>
+                      <span className="text-foreground">{option.text}</span>
+                    </div>
+                  </label>
+                ))}
+              </div>
             </div>
 
             <Button
