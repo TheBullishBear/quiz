@@ -69,16 +69,34 @@ const Quiz = () => {
       return;
     }
 
-    // Fetch all questions for the current round (without answers)
+    // Fetch ONLY admin-selected questions for this session from session_questions
+    const { data: sessionQuestions } = await supabase
+      .from('session_questions')
+      .select('question_id, question_order')
+      .eq('session_id', sessionData.id)
+      .order('question_order', { ascending: true });
+
+    if (!sessionQuestions || sessionQuestions.length === 0) {
+      return;
+    }
+
+    const questionIds = sessionQuestions.map(sq => sq.question_id);
+
+    // Fetch question details (without answers) for selected questions only
     const { data: roundQuestions } = await supabase
       .from('questions_without_answers')
       .select('*')
-      .eq('round_number', currentRound)
-      .order('question_order', { ascending: true });
+      .in('id', questionIds);
 
     if (!roundQuestions || roundQuestions.length === 0) {
       return;
     }
+
+    // Sort questions by session_questions order
+    const orderMap = new Map(sessionQuestions.map(sq => [sq.question_id, sq.question_order]));
+    const sortedQuestions = roundQuestions.sort((a, b) => 
+      (orderMap.get(a.id) || 0) - (orderMap.get(b.id) || 0)
+    );
 
     // Fetch user's answers for this session
     const { data: userAnswers } = await supabase
@@ -90,7 +108,7 @@ const Quiz = () => {
     const answeredQuestionIds = new Set(userAnswers?.map(a => a.question_id) || []);
 
     // Find the first unanswered question
-    const nextQuestion = roundQuestions.find(q => !answeredQuestionIds.has(q.id));
+    const nextQuestion = sortedQuestions.find(q => !answeredQuestionIds.has(q.id));
 
     if (nextQuestion) {
       setCurrentQuestion(nextQuestion);
@@ -150,8 +168,10 @@ const Quiz = () => {
       });
 
       setAnswer('');
-      // Wait for next question
       setCurrentQuestion(null);
+      
+      // Fetch next question automatically
+      await fetchActiveSession();
     } catch (error: any) {
       toast({
         title: "Submission Failed",

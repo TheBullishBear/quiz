@@ -22,6 +22,13 @@ const Dashboard = () => {
     if (user) {
       fetchProfile();
       fetchActiveSession();
+      
+      // Set up polling to update session status every 3 seconds
+      const interval = setInterval(() => {
+        fetchActiveSession();
+      }, 3000);
+
+      return () => clearInterval(interval);
     }
   }, [user]);
 
@@ -35,14 +42,30 @@ const Dashboard = () => {
   };
 
   const fetchActiveSession = async () => {
-    const { data } = await supabase
-      .from('quiz_sessions')
-      .select('*')
-      .neq('status', 'completed')
-      .order('created_at', { ascending: false })
+    if (!user) return;
+
+    // First, get the session the user is assigned to
+    const { data: userSession } = await supabase
+      .from('session_users')
+      .select('session_id')
+      .eq('user_id', user.id)
       .limit(1)
       .single();
-    setActiveSession(data);
+
+    if (!userSession) {
+      setActiveSession(null);
+      return;
+    }
+
+    // Then get that session's details
+    const { data: sessionData } = await supabase
+      .from('quiz_sessions')
+      .select('*')
+      .eq('id', userSession.session_id)
+      .neq('status', 'completed')
+      .single();
+
+    setActiveSession(sessionData || null);
   };
 
   const handleSignOut = async () => {
