@@ -20,6 +20,16 @@ const Index = () => {
   const [adminDialogOpen, setAdminDialogOpen] = useState(false);
 
   useEffect(() => {
+    // Check if we're in the process of signing out
+    const signingOut = sessionStorage.getItem('signingOut');
+    if (signingOut === 'true') {
+      // Clear the flag
+      sessionStorage.removeItem('signingOut');
+      // Don't redirect if we're signing out - let the user stay on the home page
+      return;
+    }
+    
+    // Only redirect to dashboard if user is authenticated and we're not signing out
     if (!loading && user) {
       navigate('/dashboard');
     }

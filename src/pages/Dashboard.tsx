@@ -5,10 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { supabase } from '@/lib/supabase';
 import { Trophy, Users, Clock, Award } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 const Dashboard = () => {
   const { user, isAdmin, isApproved, loading } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [profile, setProfile] = useState<any>(null);
   const [activeSession, setActiveSession] = useState<any>(null);
 
@@ -69,8 +71,30 @@ const Dashboard = () => {
   };
 
   const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+    // Set flag first to prevent redirect loops
+    sessionStorage.setItem('signingOut', 'true');
+    
+    try {
+      // Sign out from Supabase
+      await supabase.auth.signOut();
+    } catch (error) {
+      console.warn('Sign out error:', error);
+    }
+    
+    // Clear all localStorage items (Supabase stores auth tokens here)
+    // We clear everything to ensure no auth data remains
+    localStorage.clear();
+    
+    // Clear sessionStorage except for our signingOut flag
+    const signingOutFlag = sessionStorage.getItem('signingOut');
+    sessionStorage.clear();
+    if (signingOutFlag) {
+      sessionStorage.setItem('signingOut', 'true');
+    }
+    
+    // Force navigation with full page reload
+    // This ensures all React state is cleared and auth context re-initializes
+    window.location.href = '/';
   };
 
   if (loading) {

@@ -12,19 +12,24 @@ if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
   if (!SUPABASE_PUBLISHABLE_KEY) missingVars.push('VITE_SUPABASE_PUBLISHABLE_KEY');
   
   console.error('❌ Missing required environment variables:', missingVars.join(', '));
-  console.error('Please ensure these are set in your Vercel environment variables:');
+  console.error('Please ensure these are set in your .env file or Vercel environment variables:');
   console.error('  - VITE_SUPABASE_URL');
   console.error('  - VITE_SUPABASE_PUBLISHABLE_KEY');
   console.error('\nNote: In Vercel, these must be prefixed with VITE_ to be exposed to the client.');
+  console.error('\nCreating a placeholder client. The app will not function correctly until these are set.');
   
-  // Throw error to prevent silent failures
-  throw new Error(`Missing required environment variables: ${missingVars.join(', ')}`);
+  // Create a placeholder client instead of throwing to allow the app to render
+  // This prevents the app from crashing and shows a better error message
 }
 
 // Import the supabase client like this:
 // import { supabase } from "@/integrations/supabase/client";
 
-export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+// Use placeholder values if env vars are missing to prevent app crash
+const supabaseUrl = SUPABASE_URL || 'https://placeholder.supabase.co';
+const supabaseKey = SUPABASE_PUBLISHABLE_KEY || 'placeholder-key';
+
+export const supabase = createClient<Database>(supabaseUrl, supabaseKey, {
   auth: {
     storage: localStorage,
     persistSession: true,
