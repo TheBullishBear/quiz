@@ -7,7 +7,7 @@ import { AuthProvider } from "./contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
-import Quiz from "./pages/Quiz";
+import Quiz from "./pages/quiz";
 import Admin from "./pages/Admin";
 import ConnectionTest from "./pages/ConnectionTest";
 import NotFound from "./pages/NotFound";
